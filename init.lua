@@ -416,6 +416,11 @@ require('lazy').setup {
         pickers = {
           buffers = {
             initial_mode = "normal",
+            mappings = {
+              n = {
+                ["d"] = actions.delete_buffer,
+              }
+            },
           },
         },
         extensions = {
