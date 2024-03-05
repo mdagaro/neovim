@@ -412,12 +412,10 @@ require('lazy').setup {
               ["q"] = actions.close,
             },
           },
-          initial_mode = "normal",
         },
         pickers = {
           buffers = {
-            mappings = {
-            }
+            initial_mode = "normal",
           },
         },
         extensions = {
