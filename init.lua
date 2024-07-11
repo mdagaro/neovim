@@ -111,6 +111,10 @@ vim.opt.showmode = false
 --  Remove this option if you want your OS clipboard to remain independent.
 --  See `:help 'clipboard'`
 -- vim.opt.clipboard = 'unnamedplus'
+--
+vim.opt.swapfile = false
+vim.opt.backup = false
+vim.opt.writebackup = false
 
 -- Enable break indent
 vim.opt.breakindent = true
@@ -174,26 +178,20 @@ vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagn
 --  Use CTRL+<hjkl> to switch between windows
 --
 --  See `:help wincmd` for a list of all window commands
-vim.keymap.set('n', '<C-h>', '<C-w><C-h>', { desc = 'Move focus to the left window' })
-vim.keymap.set('n', '<C-l>', '<C-w><C-l>', { desc = 'Move focus to the right window' })
-vim.keymap.set('n', '<C-j>', '<C-w><C-j>', { desc = 'Move focus to the lower window' })
-vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper window' })
+vim.keymap.set('n', '<C-h>', '<C-w><C-h>')
+vim.keymap.set('n', '<C-l>', '<C-w><C-l>')
+vim.keymap.set('n', '<C-j>', '<C-w><C-j>')
+vim.keymap.set('n', '<C-k>', '<C-w><C-k>')
+vim.keymap.set('t', '<C-n>', '<C-\\><C-n>')
 
-vim.opt.guicursor="n-v-c-i:block"
+vim.api.nvim_command("autocmd TermOpen * startinsert")             -- starts in insert mode
+vim.api.nvim_command("autocmd TermOpen * setlocal nonumber")       -- no numbers
+vim.api.nvim_command("autocmd TermEnter * setlocal signcolumn=no") -- no sign column
+
+vim.opt.guicursor = "n-v-c-i:block"
 
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
-
--- Highlight when yanking (copying) text
---  Try it with `yap` in normal mode
---  See `:help vim.highlight.on_yank()`
-vim.api.nvim_create_autocmd('TextYankPost', {
-  desc = 'Highlight when yanking (copying) text',
-  group = vim.api.nvim_create_augroup('kickstart-highlight-yank', { clear = true }),
-  callback = function()
-    vim.highlight.on_yank()
-  end,
-})
 
 -- [[ Install `lazy.nvim` plugin manager ]]
 --    See `:help lazy.nvim.txt` or https://github.com/folke/lazy.nvim for more info
@@ -217,10 +215,17 @@ vim.opt.rtp:prepend(lazypath)
 -- NOTE: Here is where you install your plugins.
 require('lazy').setup {
   -- NOTE: Plugins can be added with a link (or for a github repo: 'owner/repo' link).
-  { url = 'git@github.com:tpope/vim-sleuth'}, -- Detect tabstop and shiftwidth automatically
+  { url = 'git@github.com:tpope/vim-sleuth' }, -- Detect tabstop and shiftwidth automatically
   { url = 'git@github.com:tpope/vim-surround' },
+  { url = 'git@github.com:tpope/vim-commentary' },
   { url = 'git@github.com:tpope/vim-fugitive' },
+  { url = 'git@github.com:itchyny/lightline.vim' },
   {
+    url = 'git@github.com:karb94/neoscroll.nvim',
+    config = function()
+      require('neoscroll').setup {}
+    end
+  },
   "git@github.com:christoomey/vim-tmux-navigator",
   cmd = {
     "TmuxNavigateLeft",
@@ -230,12 +235,11 @@ require('lazy').setup {
     "TmuxNavigatePrevious",
   },
   keys = {
-    { "<c-h>", "<cmd><C-U>TmuxNavigateLeft<cr>" },
-    { "<c-j>", "<cmd><C-U>TmuxNavigateDown<cr>" },
-    { "<c-k>", "<cmd><C-U>TmuxNavigateUp<cr>" },
-    { "<c-l>", "<cmd><C-U>TmuxNavigateRight<cr>" },
+    { "<c-h>",  "<cmd><C-U>TmuxNavigateLeft<cr>" },
+    { "<c-j>",  "<cmd><C-U>TmuxNavigateDown<cr>" },
+    { "<c-k>",  "<cmd><C-U>TmuxNavigateUp<cr>" },
+    { "<c-l>",  "<cmd><C-U>TmuxNavigateRight<cr>" },
     { "<c-\\>", "<cmd><C-U>TmuxNavigatePrevious<cr>" },
-  },
   },
   {
     "nvim-neo-tree/neo-tree.nvim",
@@ -247,17 +251,25 @@ require('lazy').setup {
     },
     config = function()
       require("neo-tree").setup({
-        window ={
-          position="right",
+        window = {
+          position = "right",
           mappings = {
             ["u"] = "navigate_up",
             ["C"] = "set_root",
           }
+        },
+        event_handlers = {
+          {
+            event = "file_opened",
+            handler = function()
+              require("neo-tree.command").execute({ action = "close" })
+            end
+          },
         }
       })
       local command = require("neo-tree.command")
       vim.keymap.set('n', '<leader>nn', function()
-        command.execute({ toggle=true })
+        command.execute({ toggle = true })
       end
       )
 
@@ -273,9 +285,30 @@ require('lazy').setup {
             reveal_file = vim.fn.getcwd()
           end
         end
-        command.execute({ reveal_file=reveal_file})
+        command.execute({ reveal_file = reveal_file })
       end
       )
+    end,
+  },
+  {
+    url = 'git@github.com:stevearc/conform.nvim',
+    enabled = true,
+    opts = {},
+    config = function()
+      require("conform").setup({
+        formatters_by_ft = {
+          -- Conform will run multiple formatters sequentially
+          python = { "black" },
+        },
+        format_after_save = {
+          lsp_fallback = true,
+        },
+        formatters = {
+          black = {
+            prepend_args = { "--line-length", "80" },
+          }
+        }
+      })
     end
   },
 
@@ -371,11 +404,11 @@ require('lazy').setup {
         --
         defaults = {
           mappings = {
-              i = {
-                ["<enter>"] = {"<esc>", type= "command"},
-                ["c-c"] = {"<esc>", type= "command"},
-              },
-              n = {
+            i = {
+              ["<enter>"] = { "<esc>", type = "command" },
+              ["c-c"] = { "<esc>", type = "command" },
+            },
+            n = {
               ["<C-c>"] = actions.close,
               ["q"] = actions.close,
             },
@@ -412,8 +445,9 @@ require('lazy').setup {
       vim.keymap.set('n', '<leader>sg', builtin.live_grep, { desc = '[S]earch by [G]rep' })
       vim.keymap.set('n', '<leader>sd', builtin.diagnostics, { desc = '[S]earch [D]iagnostics' })
       vim.keymap.set('n', '<leader>sr', builtin.resume, { desc = '[S]earch [R]esume' })
-      vim.keymap.set('n', '<leader>f', builtin.oldfiles, { desc = '[S]earch Recent Files',  })
-      vim.keymap.set('n', '<leader>o', function() builtin.buffers({sort_mru = true}) end, { desc = '[o] Find existing buffers' })
+      vim.keymap.set('n', '<leader>f', builtin.oldfiles, { desc = '[S]earch Recent Files', })
+      vim.keymap.set('n', '<leader>o', function() builtin.buffers({ sort_mru = true }) end,
+        { desc = '[o] Find existing buffers' })
 
       -- Slightly advanced example of overriding default behavior and theme
       vim.keymap.set('n', '<leader>/', function()
@@ -575,8 +609,16 @@ require('lazy').setup {
       local servers = {
         -- clangd = {},
         -- gopls = {},
-        -- pyright = {},
-        -- rust_analyzer = {},
+        pyright = {},
+        rust_analyzer = {
+          settings = {
+            ['rust-analyzer'] = {
+              diagnostics = {
+                enable = true,
+              }
+            }
+          }
+        },
         -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
         --
         -- Some languages (like typescript) have entire language plugins that can be useful:
@@ -745,11 +787,11 @@ require('lazy').setup {
     -- If you want to see what colorschemes are already installed, you can use `:Telescope colorscheme`
     'git@github.com:catppuccin/nvim',
     name = "catppuccin",
-    lazy = false, -- make sure we load this during startup if it is your main colorscheme
+    lazy = false,    -- make sure we load this during startup if it is your main colorscheme
     priority = 1000, -- make sure to load this before all the other start plugins
     config = function()
       require('catppuccin').setup({
-        flavour="mocha",
+        flavour = "mocha",
         integrations = {
           mini = {
             enabled = true,
@@ -766,6 +808,7 @@ require('lazy').setup {
   { -- Collection of various small independent plugins/modules
     'echasnovski/mini.nvim',
     config = function()
+      require('mini.comment').setup()
       -- Simple and easy statusline.
       --  You could remove this setup call if you don't like it,
       --  and try some other statusline plugin
@@ -797,7 +840,7 @@ require('lazy').setup {
         -- Autoinstall languages that are not installed
         auto_install = true,
         highlight = { enable = true },
-        indent = { enable = true },
+        indent = { enable = true }
       }
 
       -- There are additional nvim-treesitter modules that you can use to interact
@@ -828,6 +871,33 @@ require('lazy').setup {
   --    For additional information, see `:help lazy.nvim-lazy.nvim-structuring-your-plugins`
   -- { import = 'custom.plugins' },
 }
+-- Command to toggle inline diagnostics
+vim.api.nvim_create_user_command(
+  'DiagnosticsToggleVirtualText',
+  function()
+    local current_value = vim.diagnostic.config().virtual_text
+    if current_value then
+      vim.diagnostic.config({ virtual_text = false })
+    else
+      vim.diagnostic.config({ virtual_text = true })
+    end
+  end,
+  {}
+)
+
+-- Command to toggle diagnostics
+vim.api.nvim_create_user_command(
+  'DiagnosticsToggle',
+  function()
+    local current_value = vim.diagnostic.is_disabled()
+    if current_value then
+      vim.diagnostic.enable()
+    else
+      vim.diagnostic.disable()
+    end
+  end,
+  {}
+)
 
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
